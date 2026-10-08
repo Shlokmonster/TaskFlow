@@ -1,0 +1,498 @@
+/*
+ * Styling for the TaskFlow API docs page.
+ *
+ * Two jobs: make the Swagger UI comfortable to read for a demo, and style the
+ * "How to test" guide that swagger-guide.js appends below it. Everything is
+ * scoped under .tf-* so nothing leaks into Swagger UI's own classes.
+ */
+
+:root {
+  --tf-ink: #16202c;
+  --tf-muted: #5b6b7c;
+  --tf-line: #dbe3ec;
+  --tf-bg: #ffffff;
+  --tf-bg-soft: #f5f8fb;
+  --tf-accent: #1f6feb;
+  --tf-accent-soft: #e8f1ff;
+  --tf-code-bg: #0f172a;
+  --tf-code-ink: #dbe6f5;
+  --tf-get: #1f6feb;
+  --tf-post: #177f4b;
+  --tf-put: #b26a00;
+  --tf-patch: #7a45c9;
+  --tf-delete: #c02b2b;
+  --tf-radius: 8px;
+}
+
+/* A slightly tighter Swagger UI reads better on a projector. */
+.swagger-ui .topbar {
+  background: linear-gradient(90deg, #16202c 0%, #24405c 100%);
+}
+
+.swagger-ui .topbar-wrapper .link span {
+  font-weight: 600;
+}
+
+.swagger-ui .info {
+  margin: 34px 0 24px;
+}
+
+.swagger-ui .info .title small.version-stamp {
+  background: var(--tf-accent);
+}
+
+.swagger-ui .opblock-tag {
+  font-size: 22px;
+}
+
+.swagger-ui .opblock .opblock-summary-description {
+  font-size: 13px;
+}
+
+/* ---------------------------------------------------------------- guide --- */
+
+.tf-guide {
+  max-width: 1460px;
+  margin: 0 auto 0;
+  padding: 0 20px 80px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  color: var(--tf-ink);
+  line-height: 1.6;
+}
+
+.tf-guide * {
+  box-sizing: border-box;
+}
+
+.tf-guide__hero {
+  margin-top: 56px;
+  padding: 28px 32px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #16202c 0%, #24405c 100%);
+  color: #fff;
+}
+
+.tf-guide__hero h2 {
+  margin: 0 0 6px;
+  font-size: 26px;
+  letter-spacing: -0.02em;
+}
+
+.tf-guide__hero p {
+  margin: 0;
+  color: #c9d6e4;
+  font-size: 15px;
+}
+
+.tf-guide h3 {
+  margin: 40px 0 12px;
+  font-size: 20px;
+  letter-spacing: -0.01em;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--tf-line);
+}
+
+.tf-guide h4 {
+  margin: 24px 0 8px;
+  font-size: 15px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--tf-muted);
+}
+
+.tf-guide p {
+  margin: 10px 0;
+}
+
+.tf-guide code {
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.88em;
+  background: var(--tf-bg-soft);
+  border: 1px solid var(--tf-line);
+  border-radius: 5px;
+  padding: 1px 5px;
+}
+
+/* Sign-in buttons -------------------------------------------------------- */
+
+.tf-signin {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0 8px;
+}
+
+.tf-btn {
+  font: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: var(--tf-radius);
+  border: 1px solid var(--tf-line);
+  background: var(--tf-bg);
+  color: var(--tf-ink);
+  padding: 9px 16px;
+  transition: background 0.15s, border-color 0.15s, transform 0.05s;
+}
+
+.tf-btn:hover {
+  background: var(--tf-accent-soft);
+  border-color: var(--tf-accent);
+}
+
+.tf-btn:active {
+  transform: translateY(1px);
+}
+
+.tf-btn--primary {
+  background: var(--tf-accent);
+  border-color: var(--tf-accent);
+  color: #fff;
+}
+
+.tf-btn--primary:hover {
+  background: #1657c4;
+  border-color: #1657c4;
+  color: #fff;
+}
+
+.tf-btn--ghost {
+  background: transparent;
+  font-weight: 500;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.tf-status {
+  font-size: 14px;
+  font-weight: 500;
+  min-height: 22px;
+  margin: 6px 0 0;
+}
+
+.tf-status--ok {
+  color: #177f4b;
+}
+
+.tf-status--error {
+  color: var(--tf-delete);
+}
+
+.tf-status--info {
+  color: var(--tf-muted);
+}
+
+/* Steps ------------------------------------------------------------------ */
+
+.tf-steps {
+  list-style: none;
+  counter-reset: tf-step;
+  padding: 0;
+  margin: 16px 0;
+}
+
+.tf-steps > li {
+  counter-increment: tf-step;
+  position: relative;
+  padding: 16px 18px 16px 62px;
+  margin-bottom: 12px;
+  border: 1px solid var(--tf-line);
+  border-radius: var(--tf-radius);
+  background: var(--tf-bg);
+}
+
+.tf-steps > li::before {
+  content: counter(tf-step);
+  position: absolute;
+  left: 16px;
+  top: 15px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--tf-accent);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tf-steps strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.tf-steps .tf-hint {
+  color: var(--tf-muted);
+  font-size: 14px;
+}
+
+/* Tables ----------------------------------------------------------------- */
+
+.tf-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0 20px;
+  font-size: 14px;
+  background: var(--tf-bg);
+  border: 1px solid var(--tf-line);
+  border-radius: var(--tf-radius);
+  overflow: hidden;
+}
+
+.tf-table th,
+.tf-table td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--tf-line);
+  vertical-align: top;
+}
+
+.tf-table th {
+  background: var(--tf-bg-soft);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--tf-muted);
+}
+
+.tf-table tr:last-child td {
+  border-bottom: none;
+}
+
+.tf-table tbody tr:hover {
+  background: #fafcfe;
+}
+
+.tf-table code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+}
+
+/* Method badges ---------------------------------------------------------- */
+
+.tf-method {
+  display: inline-block;
+  min-width: 58px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #fff;
+  border-radius: 4px;
+  padding: 3px 7px;
+  text-transform: uppercase;
+}
+
+.tf-method--get { background: var(--tf-get); }
+.tf-method--post { background: var(--tf-post); }
+.tf-method--put { background: var(--tf-put); }
+.tf-method--patch { background: var(--tf-patch); }
+.tf-method--delete { background: var(--tf-delete); }
+
+.tf-role {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 2px 9px;
+  border: 1px solid var(--tf-line);
+  background: var(--tf-bg-soft);
+  color: var(--tf-muted);
+  white-space: nowrap;
+}
+
+.tf-role--public { border-color: #bfe0cd; background: #eaf7f0; color: #177f4b; }
+.tf-role--member { border-color: #cfe0f7; background: #eef5ff; color: #1f6feb; }
+.tf-role--admin { border-color: #f0d0d0; background: #fdefef; color: #c02b2b; }
+
+.tf-endpoint-link {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px dotted var(--tf-line);
+}
+
+.tf-endpoint-link:hover {
+  border-bottom-color: var(--tf-accent);
+  color: var(--tf-accent);
+}
+
+/* Code blocks ------------------------------------------------------------ */
+
+.tf-code {
+  position: relative;
+  margin: 12px 0 20px;
+}
+
+.tf-code pre {
+  margin: 0;
+  padding: 16px 18px;
+  overflow-x: auto;
+  border-radius: var(--tf-radius);
+  background: var(--tf-code-bg);
+  color: var(--tf-code-ink);
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  tab-size: 2;
+}
+
+.tf-code code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+}
+
+.tf-copy {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  color: #a9bcd4;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 5px;
+  padding: 4px 9px;
+}
+
+.tf-copy:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.tf-copy--done {
+  color: #7ce0a8;
+  border-color: rgba(124, 224, 168, 0.5);
+}
+
+/* The same button inside a table row — light background, no absolute position. */
+.tf-copy--inline {
+  position: static;
+  color: var(--tf-accent);
+  background: var(--tf-accent-soft);
+  border-color: var(--tf-line);
+  padding: 3px 10px;
+}
+
+.tf-copy--inline:hover {
+  color: #fff;
+  background: var(--tf-accent);
+  border-color: var(--tf-accent);
+}
+
+.tf-copy--inline.tf-copy--done {
+  color: #177f4b;
+  border-color: #bfe0cd;
+  background: #eaf7f0;
+}
+
+/* Callouts --------------------------------------------------------------- */
+
+.tf-note {
+  border-left: 4px solid var(--tf-accent);
+  background: var(--tf-accent-soft);
+  border-radius: 0 var(--tf-radius) var(--tf-radius) 0;
+  padding: 12px 16px;
+  margin: 16px 0;
+  font-size: 14px;
+}
+
+.tf-note--warn {
+  border-left-color: #b26a00;
+  background: #fff7e8;
+}
+
+.tf-note strong {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.tf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  margin: 16px 0;
+}
+
+.tf-card {
+  border: 1px solid var(--tf-line);
+  border-radius: var(--tf-radius);
+  padding: 14px 16px;
+  background: var(--tf-bg);
+}
+
+.tf-card h5 {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+
+.tf-card p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--tf-muted);
+}
+
+.tf-footer {
+  margin-top: 48px;
+  padding-top: 18px;
+  border-top: 1px solid var(--tf-line);
+  color: var(--tf-muted);
+  font-size: 13px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+
+/* Dark mode — Swagger UI's own dark stylesheet sets .swagger-ui on a dark bg. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tf-ink: #e5edf6;
+    --tf-muted: #9fb0c2;
+    --tf-line: #2a3a4c;
+    --tf-bg: #16202c;
+    --tf-bg-soft: #1d2938;
+    --tf-accent-soft: #1b2c45;
+  }
+
+  .tf-table tbody tr:hover {
+    background: #1a2534;
+  }
+
+  .tf-note--warn {
+    background: #2c2415;
+  }
+
+  .tf-role--public { background: #16301f; color: #7ce0a8; border-color: #245034; }
+  .tf-role--member { background: #16273d; color: #8ab6ff; border-color: #26456e; }
+  .tf-role--admin { background: #331b1b; color: #ff9a9a; border-color: #5c2f2f; }
+
+  .tf-copy--inline.tf-copy--done {
+    background: #16301f;
+    border-color: #245034;
+  }
+}
+
+@media (max-width: 700px) {
+  .tf-guide {
+    padding: 0 12px 60px;
+  }
+
+  .tf-table {
+    font-size: 13px;
+  }
+
+  .tf-table th,
+  .tf-table td {
+    padding: 8px 9px;
+  }
+}

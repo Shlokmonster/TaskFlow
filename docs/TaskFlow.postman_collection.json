@@ -1,0 +1,803 @@
+{
+  "info": {
+    "_postman_id": "b7f1c2d4-5a6e-4f7b-9c8d-1e2f3a4b5c6d",
+    "name": "TaskFlow API",
+    "description": "TaskFlow — task management backend.\n\n**Getting started**\n1. Run `npm run seed` to create demo accounts, or `POST /api/auth/register`.\n2. Run **Auth → Login** — the test script stores the returned JWT in the `token` collection variable automatically.\n3. Every other request inherits `Bearer {{token}}` from the collection auth.\n\n**Variables**: `baseUrl`, `token`, `projectId`, `taskId`, `commentId`, `userId`, `teamId`. Requests that create a resource save its id into the matching variable.\n\n**Roles**: member → own tasks · lead → own projects/tasks/team · admin → everything, including `/api/admin`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Nothing to do — auth is inherited from the collection level."
+        ]
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000" },
+    { "key": "token", "value": "" },
+    { "key": "userId", "value": "" },
+    { "key": "projectId", "value": "" },
+    { "key": "taskId", "value": "" },
+    { "key": "commentId", "value": "" },
+    { "key": "teamId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Liveness",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] },
+            "description": "Unauthenticated liveness probe. Reports database state and whether Firebase push is available."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('database reachable', () => pm.expect(pm.response.json().data.database).to.eql('connected'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "API health",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/health", "host": ["{{baseUrl}}"], "path": ["api", "health"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Mia Member\",\n  \"email\": \"mia@taskflow.dev\",\n  \"password\": \"Passw0rd!\",\n  \"fcmToken\": \"optional-device-token\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/register", "host": ["{{baseUrl}}"], "path": ["api", "auth", "register"] },
+            "description": "Creates a `member` account. A `role` field in the body is ignored — promotion is an admin action."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.data && json.data.token) {",
+                  "  pm.collectionVariables.set('token', json.data.token);",
+                  "  pm.collectionVariables.set('userId', json.data.user.id);",
+                  "}",
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login (email + password)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"lead@taskflow.dev\",\n  \"password\": \"Passw0rd!\",\n  \"fcmToken\": \"demo-lead-device\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+            "description": "Run this first. The test script stores the JWT in `{{token}}`, which every other request inherits. Include `fcmToken` to register the device for push notifications."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "if (json.data && json.data.token) {",
+                  "  pm.collectionVariables.set('token', json.data.token);",
+                  "  pm.collectionVariables.set('userId', json.data.user.id);",
+                  "  console.log('Token saved. Signed in as ' + json.data.user.email + ' (' + json.data.user.role + ')');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login (Firebase ID token)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firebaseToken\": \"<firebase-id-token>\",\n  \"fcmToken\": \"optional-device-token\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+            "description": "Alternative credential. Returns 503 when the server has no Firebase credentials — that is the documented graceful-degradation path."
+          }
+        },
+        {
+          "name": "Firebase exchange",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"firebaseToken\": \"<firebase-id-token>\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/auth/firebase", "host": ["{{baseUrl}}"], "path": ["api", "auth", "firebase"] }
+          }
+        },
+        {
+          "name": "Current user",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/auth/me", "host": ["{{baseUrl}}"], "path": ["api", "auth", "me"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('never returns a password hash', () => pm.expect(pm.response.text()).to.not.match(/\\$2[aby]\\$/));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update profile",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Liam Lead\",\n  \"fcmToken\": \"another-device-token\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/auth/me", "host": ["{{baseUrl}}"], "path": ["api", "auth", "me"] }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"fcmToken\": \"another-device-token\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/auth/logout", "host": ["{{baseUrl}}"], "path": ["api", "auth", "logout"] },
+            "description": "Unregisters a device token so it stops receiving push notifications."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Projects",
+      "item": [
+        {
+          "name": "List projects (with progress)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/projects?page=1&limit=20&status=active&sort=-createdAt",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "projects"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "status", "value": "active", "description": "Comma separated: planning,active,on-hold,completed,archived" },
+                { "key": "search", "value": "", "disabled": true },
+                { "key": "sort", "value": "-createdAt" }
+              ]
+            },
+            "description": "Each project carries a `progress` report: totalTasks, completed, inProgress, review, todo, overdue, completionPercentage, averageProgress, byPriority."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('every project has a progress report', () => {",
+                  "  json.data.forEach(p => pm.expect(p.progress).to.have.property('completionPercentage'));",
+                  "});",
+                  "if (json.data.length) pm.collectionVariables.set('projectId', json.data[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create project (lead/admin)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Apollo Redesign\",\n  \"key\": \"APO\",\n  \"description\": \"Rebuild the customer dashboard\",\n  \"status\": \"active\",\n  \"startDate\": \"2026-01-01T00:00:00.000Z\",\n  \"endDate\": \"2026-06-30T00:00:00.000Z\",\n  \"tags\": [\"frontend\"]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/projects", "host": ["{{baseUrl}}"], "path": ["api", "projects"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "if (json.data && json.data.id) pm.collectionVariables.set('projectId', json.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get project",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/projects/{{projectId}}", "host": ["{{baseUrl}}"], "path": ["api", "projects", "{{projectId}}"] }
+          }
+        },
+        {
+          "name": "Update project",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"on-hold\",\n  \"description\": \"Paused pending design review\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/projects/{{projectId}}", "host": ["{{baseUrl}}"], "path": ["api", "projects", "{{projectId}}"] },
+            "description": "Broadcasts `project:updated` to the project room and, when the project belongs to a team, the team room."
+          }
+        },
+        {
+          "name": "Delete project",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/projects/{{projectId}}", "host": ["{{baseUrl}}"], "path": ["api", "projects", "{{projectId}}"] },
+            "description": "Owner or admin only. Cascades to the project's tasks, their comments and their time entries."
+          }
+        },
+        {
+          "name": "Add members",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"members\": [\"{{userId}}\"]\n}" },
+            "url": { "raw": "{{baseUrl}}/api/projects/{{projectId}}/members", "host": ["{{baseUrl}}"], "path": ["api", "projects", "{{projectId}}", "members"] },
+            "description": "Added users get a push and are joined to the live `project:<id>` socket room."
+          }
+        },
+        {
+          "name": "Remove member",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/projects/{{projectId}}/members/{{userId}}", "host": ["{{baseUrl}}"], "path": ["api", "projects", "{{projectId}}", "members", "{{userId}}"] },
+            "description": "The owner cannot be removed. Tasks assigned to the removed member are unassigned."
+          }
+        },
+        {
+          "name": "Progress report",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/projects/{{projectId}}/progress", "host": ["{{baseUrl}}"], "path": ["api", "projects", "{{projectId}}", "progress"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const d = pm.response.json().data;",
+                  "pm.test('report has the required fields', () => {",
+                  "  ['totalTasks','completed','inProgress','overdue','completionPercentage'].forEach(k => pm.expect(d).to.have.property(k));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Gantt data",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/projects/{{projectId}}/gantt", "host": ["{{baseUrl}}"], "path": ["api", "projects", "{{projectId}}", "gantt"] },
+            "description": "Tasks as bars: start, end, progress, dependencies, plus the project window."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tasks",
+      "item": [
+        {
+          "name": "List tasks (filters + pagination)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks?page=1&limit=20&status=todo,in-progress&priority=high,critical&sort=-deadline",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "project", "value": "{{projectId}}", "disabled": true },
+                { "key": "assignee", "value": "{{userId}}", "disabled": true },
+                { "key": "status", "value": "todo,in-progress" },
+                { "key": "priority", "value": "high,critical" },
+                { "key": "dueBefore", "value": "2026-12-31T00:00:00.000Z", "disabled": true },
+                { "key": "search", "value": "", "disabled": true },
+                { "key": "mine", "value": "true", "disabled": true },
+                { "key": "overdue", "value": "true", "disabled": true },
+                { "key": "sort", "value": "-deadline" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "if (json.data.length) pm.collectionVariables.set('taskId', json.data[0].id);",
+                  "pm.test('meta present', () => pm.expect(json.meta).to.have.property('total'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create task (lead/admin)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Wire up the payment webhook\",\n  \"description\": \"Idempotent handler for provider callbacks\",\n  \"project\": \"{{projectId}}\",\n  \"assignedTo\": \"{{userId}}\",\n  \"status\": \"todo\",\n  \"priority\": \"high\",\n  \"deadline\": \"2026-12-01T00:00:00.000Z\",\n  \"tags\": [\"backend\", \"payments\"],\n  \"estimatedHours\": 16\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/tasks", "host": ["{{baseUrl}}"], "path": ["api", "tasks"] },
+            "description": "The assignee must already be a project member. Emits `task:created`, and `task:assigned` + a push when assigned."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "if (json.data && json.data.id) pm.collectionVariables.set('taskId', json.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get task",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/tasks/{{taskId}}", "host": ["{{baseUrl}}"], "path": ["api", "tasks", "{{taskId}}"] }
+          }
+        },
+        {
+          "name": "Update task status",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"in-progress\",\n  \"progress\": 35\n}" },
+            "url": { "raw": "{{baseUrl}}/api/tasks/{{taskId}}", "host": ["{{baseUrl}}"], "path": ["api", "tasks", "{{taskId}}"] },
+            "description": "Broadcasts `task:updated` on the project room. A member may only send `status` and `progress`, and only on a task assigned to them."
+          }
+        },
+        {
+          "name": "Reassign task",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"assignedTo\": \"{{userId}}\",\n  \"deadline\": \"2026-12-15T00:00:00.000Z\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/tasks/{{taskId}}", "host": ["{{baseUrl}}"], "path": ["api", "tasks", "{{taskId}}"] },
+            "description": "Emits `task:assigned` and pushes to the new assignee. Changing the deadline pushes too."
+          }
+        },
+        {
+          "name": "Delete task",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/tasks/{{taskId}}", "host": ["{{baseUrl}}"], "path": ["api", "tasks", "{{taskId}}"] },
+            "description": "Cascades to comments and time entries and detaches dependents. Broadcasts `task:deleted`."
+          }
+        },
+        {
+          "name": "Start timer",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"note\": \"Pairing on the webhook\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/tasks/{{taskId}}/time/start", "host": ["{{baseUrl}}"], "path": ["api", "tasks", "{{taskId}}", "time", "start"] },
+            "description": "One running timer per user — a second start returns 409."
+          }
+        },
+        {
+          "name": "Stop timer",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": { "raw": "{{baseUrl}}/api/tasks/{{taskId}}/time/stop", "host": ["{{baseUrl}}"], "path": ["api", "tasks", "{{taskId}}", "time", "stop"] }
+          }
+        },
+        {
+          "name": "Task time report",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/tasks/{{taskId}}/time", "host": ["{{baseUrl}}"], "path": ["api", "tasks", "{{taskId}}", "time"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('totals present', () => pm.expect(json.meta).to.have.property('totals'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Time summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/time/summary?groupBy=user",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "time", "summary"],
+              "query": [{ "key": "groupBy", "value": "user", "description": "user or task" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Comments",
+      "item": [
+        {
+          "name": "Add comment",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"task\": \"{{taskId}}\",\n  \"body\": \"Looks good — @lead@taskflow.dev can you review?\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/comments", "host": ["{{baseUrl}}"], "path": ["api", "comments"] },
+            "description": "Broadcasts `comment:added` and pushes to the assignee and creator. `@email` mentions resolve to project members."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "if (json.data && json.data.id) pm.collectionVariables.set('commentId', json.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List comments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/comments?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "comments"],
+              "query": [
+                { "key": "task", "value": "{{taskId}}", "disabled": true },
+                { "key": "author", "value": "{{userId}}", "disabled": true },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Comments for a task (threaded)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/comments/task/{{taskId}}", "host": ["{{baseUrl}}"], "path": ["api", "comments", "task", "{{taskId}}"] }
+          }
+        },
+        {
+          "name": "Edit comment",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"body\": \"Edited: please reuse the existing table component.\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/comments/{{commentId}}", "host": ["{{baseUrl}}"], "path": ["api", "comments", "{{commentId}}"] },
+            "description": "Author or admin only."
+          }
+        },
+        {
+          "name": "Delete comment",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/comments/{{commentId}}", "host": ["{{baseUrl}}"], "path": ["api", "comments", "{{commentId}}"] },
+            "description": "Author, project lead or admin."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Teams",
+      "item": [
+        {
+          "name": "List teams",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/teams?page=1&limit=20", "host": ["{{baseUrl}}"], "path": ["api", "teams"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.data && json.data.length) pm.collectionVariables.set('teamId', json.data[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create team (lead/admin)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Platform\",\n  \"description\": \"Owns the core API and the web client\",\n  \"members\": [\n    { \"user\": \"{{userId}}\", \"role\": \"member\" }\n  ]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/teams", "host": ["{{baseUrl}}"], "path": ["api", "teams"] },
+            "description": "The creator becomes the lead automatically."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "if (json.data && json.data.id) pm.collectionVariables.set('teamId', json.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get team",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/teams/{{teamId}}", "host": ["{{baseUrl}}"], "path": ["api", "teams", "{{teamId}}"] }
+          }
+        },
+        {
+          "name": "Update team",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Core platform squad\",\n  \"members\": [\n    { \"user\": \"{{userId}}\", \"role\": \"member\" }\n  ]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/teams/{{teamId}}", "host": "{{baseUrl}}", "path": ["api", "teams", "{{teamId}}"] },
+            "description": "Team lead or admin. Membership changes are pushed onto live sockets."
+          }
+        },
+        {
+          "name": "Delete team (admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/teams/{{teamId}}", "host": ["{{baseUrl}}"], "path": ["api", "teams", "{{teamId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "List users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/users?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "users"],
+              "query": [
+                { "key": "role", "value": "lead", "disabled": true },
+                { "key": "isActive", "value": "true", "disabled": true },
+                { "key": "search", "value": "", "disabled": true },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('no password hashes', () => pm.expect(pm.response.text()).to.not.match(/\\$2[aby]\\$/));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get user",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/admin/users/{{userId}}", "host": ["{{baseUrl}}"], "path": ["api", "admin", "users", "{{userId}}"] }
+          }
+        },
+        {
+          "name": "Change role",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"lead\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/admin/users/{{userId}}/role", "host": ["{{baseUrl}}"], "path": ["api", "admin", "users", "{{userId}}", "role"] },
+            "description": "You cannot change your own role, and the last active admin cannot be demoted."
+          }
+        },
+        {
+          "name": "Activate / deactivate",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"isActive\": false\n}" },
+            "url": { "raw": "{{baseUrl}}/api/admin/users/{{userId}}/status", "host": ["{{baseUrl}}"], "path": ["api", "admin", "users", "{{userId}}", "status"] },
+            "description": "Deactivation blocks the account on its very next request."
+          }
+        },
+        {
+          "name": "List all projects",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/admin/projects?page=1&limit=20", "host": ["{{baseUrl}}"], "path": ["api", "admin", "projects"] }
+          }
+        },
+        {
+          "name": "Platform stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/admin/stats", "host": ["{{baseUrl}}"], "path": ["api", "admin", "stats"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Negative cases (RBAC)",
+      "item": [
+        {
+          "name": "No token → 401",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/projects", "host": ["{{baseUrl}}"], "path": ["api", "projects"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));",
+                  "pm.test('error envelope', () => pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unknown route → 404",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/does-not-exist", "host": ["{{baseUrl}}"], "path": ["api", "does-not-exist"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('404 Not Found', () => pm.response.to.have.status(404));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Validation error → 422",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"x\",\n  \"email\": \"not-an-email\",\n  \"password\": \"short\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/auth/register", "host": ["{{baseUrl}}"], "path": ["api", "auth", "register"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('422 Unprocessable Entity', () => pm.response.to.have.status(422));",
+                  "pm.test('field details present', () => pm.expect(pm.response.json().error.details.length).to.be.above(0));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

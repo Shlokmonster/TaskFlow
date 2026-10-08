@@ -1,0 +1,64 @@
+# ---------------------------------------------------------------------------
+# Render blueprint — https://render.com/docs/blueprint-spec
+#
+#   New → Blueprint → pick this repository → fill in the `sync: false` values
+#
+# Only MONGODB_URI and JWT_SECRET must be supplied; the rest have defaults.
+# The Firebase variables are optional — leave them blank to run without push.
+# ---------------------------------------------------------------------------
+services:
+  - type: web
+    name: taskflow-api
+    runtime: node
+    plan: free
+    region: oregon
+    branch: main
+    # --omit=dev keeps mongodb-memory-server (and its binary download) out of prod
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      # --- Required -------------------------------------------------------
+      - key: MONGODB_URI
+        sync: false # e.g. mongodb+srv://user:pass@cluster.mongodb.net/taskflow
+      - key: JWT_SECRET
+        generateValue: true # Render generates a 256-bit secret
+
+      # --- HTTP / security ------------------------------------------------
+      - key: CORS_ORIGIN
+        sync: false # e.g. https://app.example.com — blank falls back to *
+      - key: API_PREFIX
+        value: /api
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: JWT_ISSUER
+        value: taskflow
+      - key: JWT_AUDIENCE
+        value: taskflow-api
+      - key: BCRYPT_SALT_ROUNDS
+        value: 12
+      - key: RATE_LIMIT_WINDOW_MS
+        value: 900000
+      - key: RATE_LIMIT_MAX
+        value: 100
+      - key: AUTH_RATE_LIMIT_MAX
+        value: 10
+      - key: JSON_BODY_LIMIT
+        value: 1mb
+      - key: LOG_LEVEL
+        value: info
+
+      # --- Firebase Cloud Messaging (optional) ----------------------------
+      # Leave every value empty to run without push notifications.
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT_PATH
+        sync: false
