@@ -277,9 +277,11 @@ curl -s "$BASE/api/projects/$PID/progress" -H "Authorization: Bearer $TOKEN" | j
       '</div>' +
       '<h3>%N%. Sign in</h3>' +
       (hideDemo
-        ? '<div class="tf-note tf-note--warn"><strong>Production environment</strong>' +
-          'The demo sign-in buttons are hidden here. Call <code>POST /api/auth/login</code> with a real account, ' +
-          'copy <code>data.token</code>, then click <b>Authorize</b> and paste it.</div>'
+        ? '<div class="tf-note tf-note--warn"><strong>Demo sign-in is off on this deployment</strong>' +
+          'The seeded demo accounts are not published here. Call <code>POST /api/auth/login</code> with a real account, ' +
+          'copy <code>data.token</code>, then click <b>Authorize</b> and paste it. ' +
+          '(Presenting this API? Seed the database with <code>npm run seed</code> and start the server with ' +
+          '<code>DOCS_DEMO_MODE=true</code> to bring the demo back.)</div>'
         : '<p>Click a role — the token is fetched and handed to Swagger UI for you, so every ' +
           '<b>Try it out</b> below is already authorized.</p>' +
           '<div class="tf-signin">' +
@@ -311,7 +313,7 @@ curl -s "$BASE/api/projects/$PID/progress" -H "Authorization: Bearer $TOKEN" | j
       '<h3>%N%. Demo accounts</h3>' +
       (hideDemo
         ? '<div class="tf-note tf-note--warn"><strong>Demo accounts are hidden on this deployment</strong>' +
-          'This server runs in production, so the seeded logins and their shared password are not published here. ' +
+          'This server has not opted in to publishing the seeded logins and their shared password. ' +
           'Sign in with a real account from your own user list. <code>npm run seed</code> creates the set below ' +
           'on a development database.</div>'
         : '<p>Created by <code>npm run seed</code>. All of them use the password <code>' + DEMO_PASSWORD + '</code>.</p>') +
@@ -333,7 +335,7 @@ curl -s "$BASE/api/projects/$PID/progress" -H "Authorization: Bearer $TOKEN" | j
         '<h3>%N%. The scripted demo</h3>' +
         '<div class="tf-note tf-note--warn"><strong>Guided demo hidden on this deployment</strong>' +
         'The walkthrough below this line normally drives the seeded Apollo/Atlas dataset, which does not exist in ' +
-        'production. Run the server locally with <code>npm run seed</code> to follow it step by step — the endpoint ' +
+        'this database. Run the server locally with <code>npm run seed</code> to follow it step by step — the endpoint ' +
         'tables, event reference and error contract further down describe this deployment exactly as they are.</div>' +
         '<h4>The same thing from a terminal</h4>' +
         codeBlock(curlFlow(hideDemo), 'copy script')

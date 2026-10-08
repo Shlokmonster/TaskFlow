@@ -291,7 +291,7 @@ describe('the guide under Swagger UI', () => {
     expect(guide.innerHTML).not.toContain('data-signin=');
     expect(guide.innerHTML).not.toContain('Passw0rd!');
     expect(guide.innerHTML).not.toContain('@taskflow.dev');
-    expect(guide.innerHTML).toContain('Production environment');
+    expect(guide.innerHTML).toContain('Demo sign-in is off on this deployment');
     expect(guide.innerHTML).toContain('Guided demo hidden');
     expect(guide.innerHTML).not.toContain('tf-ids-body');
   });
@@ -303,7 +303,7 @@ describe('the guide under Swagger UI', () => {
 
     expect(guide.innerHTML).toContain('data-signin="lead@taskflow.dev"');
     expect(guide.innerHTML).toContain('Passw0rd!');
-    expect(guide.innerHTML).not.toContain('Production environment');
+    expect(guide.innerHTML).not.toContain('Demo sign-in is off');
   });
 
   it('hides the demo when /health cannot be reached', async () => {
