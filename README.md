@@ -108,7 +108,7 @@ role label in the guide, or if the guide ever publishes the demo password in pro
 - Centralised error handling with stable error codes and consistent JSON envelopes
 - helmet, CORS allowlist, rate limiting, request sanitisation against operator injection
 - Mongo indexes on every hot query path
-- Swagger UI with a built-in testing guide, a Postman collection, a seed script, 118 integration tests, Render/Heroku config
+- Swagger UI with a built-in testing guide, a Postman collection, a seed script, 123 integration tests, Render/Heroku config
 
 ---
 
@@ -302,7 +302,7 @@ npm test
 
 ```
 Test Suites: 7 passed, 7 total
-Tests:       118 passed, 118 total
+Tests:       123 passed, 123 total
 ```
 
 Tests run against a real MongoDB started in memory by `mongodb-memory-server` — no
