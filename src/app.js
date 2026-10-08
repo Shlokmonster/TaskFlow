@@ -74,6 +74,7 @@ app.get('/health', (_req, res) =>
       status: 'ok',
       database: dbState(),
       firebase: isFirebaseEnabled(),
+      docsDemo: env.DOCS_DEMO_MODE,
       uptime: Math.round(process.uptime() * 100) / 100,
       environment: env.NODE_ENV,
       timestamp: new Date().toISOString(),
@@ -95,19 +96,42 @@ const docsCss = (() => {
   }
 })();
 
+/**
+ * The spec with its server URL pinned to the host that is asking.
+ *
+ * Without this the document carries whatever base URL the build machine knew,
+ * so "Try it out" on a deployed instance posts to the developer's localhost.
+ * Deriving it from the request means the page is correct on Render, on a custom
+ * domain, and on a laptop, with nothing to configure.
+ */
+function specForRequest(req) {
+  const url = env.publicUrlFor(req);
+  if (!url) return swaggerSpec;
+  return { ...swaggerSpec, servers: [{ url, description: 'This server' }] };
+}
+
 // Registered before the swagger-ui middleware so it wins the /api/docs/* match.
 app.get('/api/docs/guide.js', (_req, res) => res.type('application/javascript').sendFile(path.join(DOCS_DIR, 'swagger-guide.js')));
 
-app.get('/api/docs.json', (_req, res) => res.json(swaggerSpec));
+app.get('/api/docs.json', (req, res) => res.json(specForRequest(req)));
+
+// The UI is handed the document's *URL*, not the document, so the per-request
+// rewrite above is what it actually loads.
 app.use(
   '/api/docs',
   apiLimiter,
   swaggerUi.serve,
-  swaggerUi.setup(swaggerSpec, {
+  swaggerUi.setup(null, {
     customSiteTitle: 'TaskFlow API',
     customCss: docsCss,
     customJs: '/api/docs/guide.js',
-    swaggerOptions: { persistAuthorization: true, docExpansion: 'none', filter: true, displayRequestDuration: true },
+    swaggerOptions: {
+      url: '/api/docs.json',
+      persistAuthorization: true,
+      docExpansion: 'none',
+      filter: true,
+      displayRequestDuration: true,
+    },
   })
 );
 

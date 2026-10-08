@@ -25,9 +25,14 @@ const definition = {
     ].join('\n'),
     license: { name: 'MIT' },
   },
+  // Rewritten per request in app.js so "Try it out" always targets the host
+  // serving the page; this entry is the fallback for anything reading the
+  // document outside a request (a linter, a codegen run).
   servers: [
-    { url: `http://localhost:${env.PORT}`, description: 'Local development' },
-    { url: 'https://taskflow-api.onrender.com', description: 'Render (replace with your service URL)' },
+    {
+      url: env.PUBLIC_URL || `http://localhost:${env.PORT}`,
+      description: env.PUBLIC_URL ? 'This deployment' : 'Local development',
+    },
   ],
   tags: [
     { name: 'Auth', description: 'Registration, login (password + Firebase) and profile' },

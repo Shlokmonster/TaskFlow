@@ -223,6 +223,8 @@ return. **Reset the data** at any point with `npm run seed`.
 | `NODE_ENV` | no | `development` | `development` \| `production` \| `test` |
 | `PORT` | no | `5000` | HTTP port |
 | `API_PREFIX` | no | `/api` | Prefix for all REST routes |
+| `PUBLIC_URL` | no | *(derived)* | Base URL for "Try it out" in the docs. Blank = use the request's own host — the right answer behind Render/Heroku. Set it only if a proxy rewrites the origin the browser sees |
+| `DOCS_DEMO_MODE` | no | `true` (`false` in production) | Publish the seeded demo accounts, their password and the guided walkthrough on `/api/docs` |
 | `MONGODB_URI` | **yes** | — | Mongo connection string |
 | `JWT_SECRET` | **yes** | — | Signing key, ≥ 16 chars. `openssl rand -hex 32` |
 | `JWT_EXPIRES_IN` | no | `7d` | Token lifetime (`15m`, `7d`, …) |
@@ -607,12 +609,32 @@ reports `completed: 1`, `completionPercentage: 100` — progress is derived from
 5. Click **Apply**. The first deploy installs dependencies and starts the service.
 6. Confirm it: `curl https://<your-service>.onrender.com/health` should return
    `{"success":true,"data":{"status":"ok","database":"connected",…}}`.
-7. Seed the production database once from your machine:
+7. Seed the production database once from your machine — **this wipes that database**:
    ```bash
    MONGODB_URI="<atlas-uri>" npm run seed
    ```
-8. Swagger UI is live at `https://<your-service>.onrender.com/api/docs`.
+   Skip it if you're not using the demo dataset; registration and login still work.
+8. Swagger UI is live at `https://<your-service>.onrender.com/api/docs`. `Try it out` posts
+   to the host serving the page, so it works on Render with no extra configuration.
 9. Under **Settings → Deploy**, confirm auto-deploy is on `main` if you want pushes to ship.
+
+#### Making the deployed docs page fully clickable
+
+The docs page has two halves: the endpoint reference (always on) and the guided demo, which
+lets a visitor sign in with one click and then use every route. The demo half appears only
+when the server says the demo accounts exist — `/health` reports this as `docsDemo`.
+
+- **Showing the demo on a real deployment.** `DOCS_DEMO_MODE` defaults to on outside
+  production and off inside it, so a production host shows the reference only. To turn the
+  demo on there, seed the database (step 7) and then set `DOCS_DEMO_MODE=true` on the
+  service — Render's **Environment** tab, or a `value: 'true'` in `render.yaml`. The seeded
+  password is then public, which is fine for a demo you're presenting and not for anything
+  real.
+- **A service created by hand** (Render → New → Web Service, rather than the blueprint) does
+  not read `render.yaml`, so set its variables yourself: `NODE_ENV=production` (otherwise
+  error responses include stack traces), plus the required `MONGODB_URI` and `JWT_SECRET`.
+- **A `501`/`404` from a cold start.** The free plan sleeps after 15 minutes idle; the first
+  request takes 30-60 seconds. `/health` is the warm-up call.
 
 Render injects `PORT` itself; `src/server.js` reads it, so don't set it manually.
 
@@ -651,6 +673,7 @@ connection, and force-exits after 10s).
 - [ ] `BCRYPT_SALT_ROUNDS=12`
 - [ ] MongoDB Atlas network access restricted; the connection string is the SRV form
 - [ ] Firebase credentials set if you want push — otherwise confirm `/health` says `firebase: false`
+- [ ] `/api/docs` shows the reference only (`docsDemo: false`) unless you deliberately want the demo accounts public
 - [ ] The admin account's password changed away from the seed default
 
 ---

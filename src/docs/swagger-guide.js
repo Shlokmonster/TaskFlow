@@ -4,8 +4,9 @@
  * Loaded as Swagger UI's customJs, so it runs on the docs page itself. The
  * endpoint list is built from /api/docs.json at load time rather than being
  * typed out here, so the guide can never drift from the API it documents.
- * The sign-in buttons are hidden when /health reports a production
- * environment — demo credentials should never be one click away on a live host.
+ * The sign-in buttons are shown only when /health reports docsDemo — an
+ * explicit opt-in, so a production deployment never publishes working
+ * credentials unless whoever runs it asked for that.
  */
 (function () {
   'use strict';
@@ -156,16 +157,16 @@
   /* The script blocks embed credentials. On a production deployment the demo
      accounts may exist (npm run seed runs anywhere) and their password is in
      this file, so outside development the samples carry placeholders instead. */
-  function creds(isProd) {
-    return isProd
+  function creds(hideDemo) {
+    return hideDemo
       ? { email: 'you@example.com', password: 'your-password' }
       : { email: 'lead@taskflow.dev', password: DEMO_PASSWORD };
   }
 
   /* Template literal, not an array of strings — the shell quoting is unreadable
      otherwise. The only escape needed is the `\${1:-…}` default-value expansion. */
-  function curlFlow(isProd) {
-    var c = creds(isProd);
+  function curlFlow(hideDemo) {
+    var c = creds(hideDemo);
     return `#!/usr/bin/env bash
 # The same ten steps from a terminal. Needs jq.  Usage: bash demo.sh http://localhost:5001
 set -euo pipefail
@@ -202,11 +203,11 @@ curl -s "$BASE/api/projects/$PID/progress" -H "Authorization: Bearer $TOKEN" | j
 `;
   }
 
-  function socketScript(isProd) {
-    var c = creds(isProd);
+  function socketScript(hideDemo) {
+    var c = creds(hideDemo);
     // The socket watcher connects as a member, so it sees the events that the
     // lead's actions on Swagger UI produce for someone else.
-    var email = isProd ? c.email : 'member@taskflow.dev';
+    var email = hideDemo ? c.email : 'member@taskflow.dev';
     return [
       '// Watch the live events while you click through Swagger UI.',
       '// Run from the project folder: node watch-sockets.js',
@@ -267,8 +268,7 @@ curl -s "$BASE/api/projects/$PID/progress" -H "Authorization: Bearer $TOKEN" | j
 
   /* ----------------------------------------------------------- sections -- */
 
-  function heroSection(environment) {
-    var isProd = environment === 'production';
+  function heroSection(hideDemo) {
     return (
       '<div class="tf-guide__hero">' +
       '<h2>How to test everything on this page</h2>' +
@@ -276,7 +276,7 @@ curl -s "$BASE/api/projects/$PID/progress" -H "Authorization: Bearer $TOKEN" | j
       'this guide walks the exact order to test it in, and what each step should give back.</p>' +
       '</div>' +
       '<h3>%N%. Sign in</h3>' +
-      (isProd
+      (hideDemo
         ? '<div class="tf-note tf-note--warn"><strong>Production environment</strong>' +
           'The demo sign-in buttons are hidden here. Call <code>POST /api/auth/login</code> with a real account, ' +
           'copy <code>data.token</code>, then click <b>Authorize</b> and paste it.</div>'
@@ -292,30 +292,30 @@ curl -s "$BASE/api/projects/$PID/progress" -H "Authorization: Bearer $TOKEN" | j
       codeBlock(
         'curl -s -X POST ' + location.origin + '/api/auth/login \\\n' +
           '  -H "Content-Type: application/json" \\\n' +
-          '  -d \'{"email":"' + creds(isProd).email + '","password":"' + creds(isProd).password + '"}\''
+          '  -d \'{"email":"' + creds(hideDemo).email + '","password":"' + creds(hideDemo).password + '"}\''
       )
     );
   }
 
-  function accountsSection(isProd) {
+  function accountsSection(hideDemo) {
     var rows = DEMO_ACCOUNTS.map(function (a) {
       return (
         '<tr><td><span class="tf-role ' + (a.role === 'admin' ? 'tf-role--admin' : a.role === 'lead' ? 'tf-role--member' : 'tf-role--public') + '">' +
         esc(a.role) + '</span></td>' +
-        (isProd ? '' : '<td><code>' + esc(a.email) + '</code></td>') +
+        (hideDemo ? '' : '<td><code>' + esc(a.email) + '</code></td>') +
         '<td>' + esc(a.can) + '</td></tr>'
       );
     }).join('');
 
     return (
       '<h3>%N%. Demo accounts</h3>' +
-      (isProd
+      (hideDemo
         ? '<div class="tf-note tf-note--warn"><strong>Demo accounts are hidden on this deployment</strong>' +
           'This server runs in production, so the seeded logins and their shared password are not published here. ' +
           'Sign in with a real account from your own user list. <code>npm run seed</code> creates the set below ' +
           'on a development database.</div>'
         : '<p>Created by <code>npm run seed</code>. All of them use the password <code>' + DEMO_PASSWORD + '</code>.</p>') +
-      '<table class="tf-table"><thead><tr><th>Role</th>' + (isProd ? '' : '<th>Email</th>') +
+      '<table class="tf-table"><thead><tr><th>Role</th>' + (hideDemo ? '' : '<th>Email</th>') +
       '<th>What they can do</th></tr></thead><tbody>' +
       rows +
       '</tbody></table>' +
@@ -325,8 +325,8 @@ curl -s "$BASE/api/projects/$PID/progress" -H "Authorization: Bearer $TOKEN" | j
     );
   }
 
-  function flowSection(isProd) {
-    if (isProd) {
+  function flowSection(hideDemo) {
+    if (hideDemo) {
       // The ten steps assume the seeded dataset (Apollo/Atlas, the demo users),
       // so walking through them on a production database would just 404.
       return (
@@ -336,7 +336,7 @@ curl -s "$BASE/api/projects/$PID/progress" -H "Authorization: Bearer $TOKEN" | j
         'production. Run the server locally with <code>npm run seed</code> to follow it step by step — the endpoint ' +
         'tables, event reference and error contract further down describe this deployment exactly as they are.</div>' +
         '<h4>The same thing from a terminal</h4>' +
-        codeBlock(curlFlow(isProd), 'copy script')
+        codeBlock(curlFlow(hideDemo), 'copy script')
       );
     }
 
@@ -354,7 +354,7 @@ curl -s "$BASE/api/projects/$PID/progress" -H "Authorization: Bearer $TOKEN" | j
       '<p>This is the whole product: projects, tasks, permissions, live updates, comments, reporting and time tracking.</p>' +
       '<ol class="tf-steps">' + items + '</ol>' +
       '<h4>The same thing from a terminal</h4>' +
-      codeBlock(curlFlow(isProd), 'copy script')
+      codeBlock(curlFlow(hideDemo), 'copy script')
     );
   }
 
@@ -363,8 +363,8 @@ curl -s "$BASE/api/projects/$PID/progress" -H "Authorization: Bearer $TOKEN" | j
    * first click fail. Rather than send the reader off to run a list call and
    * scroll through JSON, sign-in loads their real ids here, ready to copy.
    */
-  function idsSection(isProd) {
-    if (isProd) return '';
+  function idsSection(hideDemo) {
+    if (hideDemo) return '';
     return (
       '<h3>%N%. Your real ids</h3>' +
       '<p id="tf-ids-hint">Sign in above and your projects and tasks load here — copy an id straight into any ' +
@@ -482,7 +482,7 @@ curl -s "$BASE/api/projects/$PID/progress" -H "Authorization: Bearer $TOKEN" | j
     );
   }
 
-  function realtimeSection(isProd) {
+  function realtimeSection(hideDemo) {
     var rows = SOCKET_EVENTS.map(function (e) {
       return '<tr><td><code>' + esc(e[0]) + '</code></td><td>' + esc(e[1]) + '</td></tr>';
     }).join('');
@@ -495,7 +495,7 @@ curl -s "$BASE/api/projects/$PID/progress" -H "Authorization: Bearer $TOKEN" | j
       '<code>team:&lt;id&gt;</code> (team members). A client joins the first two automatically at handshake; ' +
       'a bad token is refused at the handshake, so a socket never sits in a room it is not entitled to.</p>' +
       '<table class="tf-table"><thead><tr><th>Event</th><th>Payload</th></tr></thead><tbody>' + rows + '</tbody></table>' +
-      codeBlock(socketScript(isProd), 'copy script') +
+      codeBlock(socketScript(hideDemo), 'copy script') +
       '<div class="tf-note"><strong>What you should see</strong>' +
       'Save that as <code>watch-sockets.js</code> in the project folder and run it, then use Swagger UI as the lead: ' +
       'creating or updating a task, or commenting, prints the payload live.</div>'
@@ -565,15 +565,18 @@ curl -s "$BASE/api/projects/$PID/progress" -H "Authorization: Bearer $TOKEN" | j
       .then(function (results) {
         var spec = results[0];
         var health = (results[1] && results[1].data) || {};
-        var isProd = health.environment === 'production';
+        // Explicit opt-in from the server, not an environment guess: a host can
+        // run with NODE_ENV=production and still want the demo dataset shown.
+        // Fails closed — if the probe never answered, assume the demo is private.
+        var hideDemo = health.docsDemo !== true;
 
         holder.innerHTML = numberSections(
-          heroSection(health.environment) +
-            accountsSection(isProd) +
-            idsSection(isProd) +
-            flowSection(isProd) +
+          heroSection(hideDemo) +
+            accountsSection(hideDemo) +
+            idsSection(hideDemo) +
+            flowSection(hideDemo) +
             endpointsSection(spec) +
-            realtimeSection(isProd) +
+            realtimeSection(hideDemo) +
             referenceSection(base)
         );
 
@@ -663,12 +666,24 @@ curl -s "$BASE/api/projects/$PID/progress" -H "Authorization: Bearer $TOKEN" | j
         })
         .catch(function (err) {
           status.className = 'tf-status tf-status--error';
-          status.textContent = '✗ ' + err.message;
+          status.textContent = '✗ ' + err.message + unseededHint(err);
         })
         .then(function () {
           button.disabled = false;
         });
     });
+  }
+
+  /**
+   * The usual reason a demo sign-in fails on an otherwise healthy deployment is
+   * an empty database: the app serves this guide, but the accounts it names only
+   * exist once `npm run seed` has run against *that* server's database.
+   */
+  function unseededHint(err) {
+    var message = String((err && err.message) || '').toLowerCase();
+    if (message.indexOf('invalid email or password') === -1) return '';
+    return ' — the demo accounts do not exist on this server yet. Run `npm run seed` against ' +
+      'its database, or click Authorize and paste a token from an account you made yourself.';
   }
 
   /** Hand the token to Swagger UI so "Try it out" is authorized. */

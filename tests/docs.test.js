@@ -125,6 +125,9 @@ describe('OpenAPI document', () => {
  * of DOM methods, and stubbing them keeps this a render test, not a browser test.
  */
 async function harness(environment, options = {}) {
+  // Mirrors the server's default: the demo is on everywhere except production,
+  // where a deployment has to opt in with DOCS_DEMO_MODE=true.
+  const docsDemo = options.docsDemo === undefined ? environment !== 'production' : options.docsDemo;
   const handlers = [];
   const elements = new Map();
 
@@ -150,7 +153,9 @@ async function harness(environment, options = {}) {
     addEventListener(type, fn) {
       handlers.push({ target: this, type, fn });
     },
-    querySelector: () => stub(),
+    // Memoized by selector so a test can read back the node the guide wrote to
+    // (the sign-in status line is looked up this way).
+    querySelector: (selector) => element(`sel:${selector}`),
     setAttribute() {},
     getAttribute: () => null,
   });
@@ -175,16 +180,19 @@ async function harness(environment, options = {}) {
   const requests = [];
   const fetch = (url, init) => {
     requests.push({ url, init });
+    const login = url.endsWith('/api/auth/login');
     const body = () => {
       if (url.endsWith('/api/docs.json')) return swaggerSpec;
-      if (url.endsWith('/api/auth/login')) {
+      if (login) {
+        if (options.loginFails) return { success: false, error: { code: 'UNAUTHORIZED', message: 'Invalid email or password' } };
         return { success: true, data: { token: 'jwt-from-the-button', user: { email: 'lead@taskflow.dev', role: 'lead' } } };
       }
       if (url.endsWith('/api/projects')) return { success: true, data: [{ id: 'project-1', name: 'Orion Rollout', key: 'ORI' }] };
       if (url.endsWith('/api/tasks')) return { success: true, data: [{ id: 'task-1', title: 'Ship the demo' }] };
-      return { data: { environment, firebase: false } };
+      if (options.healthFails) throw new Error('health probe unavailable');
+      return { data: { environment, docsDemo, firebase: false } };
     };
-    return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(body()) });
+    return Promise.resolve({ ok: true, status: login && options.loginFails ? 401 : 200, json: () => Promise.resolve(body()) });
   };
 
   const sandbox = {
@@ -277,7 +285,7 @@ describe('the guide under Swagger UI', () => {
     expect(guide.innerHTML).toContain('id="tf-ids-body"');
   });
 
-  it('hides the demo credentials in production', async () => {
+  it('hides the demo credentials when the server has not opted in', async () => {
     const guide = await renderGuide('production');
 
     expect(guide.innerHTML).not.toContain('data-signin=');
@@ -286,6 +294,27 @@ describe('the guide under Swagger UI', () => {
     expect(guide.innerHTML).toContain('Production environment');
     expect(guide.innerHTML).toContain('Guided demo hidden');
     expect(guide.innerHTML).not.toContain('tf-ids-body');
+  });
+
+  it('shows the demo on a production host that opted in with DOCS_DEMO_MODE', async () => {
+    // Safety and demo-ability are separate decisions: a real deployment can run
+    // NODE_ENV=production and still publish the seeded accounts deliberately.
+    const guide = (await harness('production', { docsDemo: true })).guide;
+
+    expect(guide.innerHTML).toContain('data-signin="lead@taskflow.dev"');
+    expect(guide.innerHTML).toContain('Passw0rd!');
+    expect(guide.innerHTML).not.toContain('Production environment');
+  });
+
+  it('hides the demo when /health cannot be reached', async () => {
+    // Fails closed: not knowing whether the demo is published is not a reason
+    // to publish it.
+    const guide = (await harness('development', { healthFails: true })).guide;
+
+    expect(guide.innerHTML).not.toContain('Passw0rd!');
+    expect(guide.innerHTML).not.toContain('data-signin=');
+    // The endpoint reference is fetched separately and still renders.
+    expect(guide.innerHTML).toContain('tf-method tf-method--');
   });
 
   it('still documents the whole API in production', async () => {
@@ -315,6 +344,20 @@ describe('clicking "Sign in as lead"', () => {
     expect(authorized).toEqual([['bearerAuth', 'jwt-from-the-button']]);
     expect(button.disabled).toBe(false);
     expect(test.element('tf-ids-body').innerHTML).toContain('ORI');
+  });
+
+  it('explains an unseeded database when the demo sign-in is refused', async () => {
+    // Exactly what the deployed server does before `npm run seed`: the account
+    // does not exist, so "Invalid email or password" needs a next step.
+    const test = await harness('development', { loginFails: true, window: { ui: { preauthorizeApiKey() {} } } });
+
+    const button = await test.clickSignIn('lead@taskflow.dev');
+
+    const status = test.element('sel:[data-signin-status]');
+    expect(status.textContent).toContain('Invalid email or password');
+    expect(status.textContent).toContain('npm run seed');
+    expect(status.className).toBe('tf-status tf-status--error');
+    expect(button.disabled).toBe(false);
   });
 
   it('fills the ids panel with real ids from the server', async () => {
@@ -358,10 +401,40 @@ describe('GET /api/docs', () => {  it('serves the Swagger UI with the custom the
     expect(res.body.paths['/api/tasks/{id}'].put.operationId).toBe('put_api_tasks_id');
   });
 
-  it('reports the environment the guide gates the demo sign-in on', async () => {
+  it('tells the guide whether the demo sign-in is published', async () => {
     const res = await request(app).get('/health').expect(200);
 
     expect(res.body.data.environment).toEqual(expect.any(String));
+    // In tests NODE_ENV is 'test', so the docs demo defaults on.
+    expect(res.body.data.docsDemo).toBe(true);
     expect(res.body.data.firebase).toBe(false); // no credentials in tests
+  });
+
+  it('points the document at the host that asked for it', async () => {
+    // The bug this guards: a spec built on a laptop carries localhost, so every
+    // "Try it out" on the deployed page posts to the developer's machine.
+    const res = await request(app)
+      .get('/api/docs.json')
+      .set('Host', 'taskflow-pqe9.onrender.com')
+      .set('X-Forwarded-Proto', 'https')
+      .expect(200);
+
+    expect(res.body.servers).toEqual([{ url: 'https://taskflow-pqe9.onrender.com', description: 'This server' }]);
+    // The document itself is untouched — same paths, same examples.
+    expect(res.body.paths['/api/tasks/{id}'].put.operationId).toBe('put_api_tasks_id');
+  });
+
+  it('lets PUBLIC_URL override the request host', () => {
+    jest.resetModules();
+    process.env.PUBLIC_URL = 'https://api.taskflow.example/';
+    try {
+      // eslint-disable-next-line global-require
+      const freshEnv = require('../src/config/env');
+
+      expect(freshEnv.publicUrlFor({ protocol: 'http', get: () => 'internal-lb:5000' })).toBe('https://api.taskflow.example');
+    } finally {
+      delete process.env.PUBLIC_URL;
+      jest.resetModules();
+    }
   });
 });

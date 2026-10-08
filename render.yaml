@@ -33,6 +33,15 @@ services:
         sync: false # e.g. https://app.example.com — blank falls back to *
       - key: API_PREFIX
         value: /api
+      # Swagger UI lives at /api/docs. Leave PUBLIC_URL blank so "Try it out"
+      # targets whatever host serves the page.
+      - key: PUBLIC_URL
+        value: ''
+      # Publishes the seeded demo accounts and the guided walkthrough on the
+      # docs page. Only switch this on for a deployment whose database has been
+      # seeded (`npm run seed`) and that is meant to be publicly clickable.
+      - key: DOCS_DEMO_MODE
+        value: 'false'
       - key: JWT_EXPIRES_IN
         value: 7d
       - key: JWT_ISSUER

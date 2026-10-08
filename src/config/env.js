@@ -14,11 +14,26 @@ const Joi = require('joi');
 require('dotenv').config({ path: path.resolve(process.cwd(), '.env') });
 
 const isTest = process.env.NODE_ENV === 'test';
+const isProd = process.env.NODE_ENV === 'production';
 
 const schema = Joi.object({
   NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
   PORT: Joi.number().port().default(5000),
   API_PREFIX: Joi.string().pattern(/^\//).default('/api'),
+
+  // Absolute public URL of this deployment, used as the OpenAPI server URL.
+  // Blank means "derive it from the request", which is right for Render, Heroku
+  // and anything else behind one host; set it when a proxy rewrites the origin.
+  PUBLIC_URL: Joi.string()
+    .uri({ scheme: [/https?/] })
+    .allow('', null)
+    .default(''),
+
+  // Publishes the seeded demo accounts — and their shared password — on the
+  // docs page, along with the guided walkthrough that assumes that dataset.
+  // Off in production unless a deployment opts in, so a real host never
+  // advertises working credentials by accident. Blank means "use the default".
+  DOCS_DEMO_MODE: Joi.boolean().empty('').default(!isProd),
 
   // Required in every environment except test, where an in-memory DB is used.
   MONGODB_URI: Joi.string()
@@ -66,6 +81,14 @@ const env = {
   IS_PROD: value.NODE_ENV === 'production',
   IS_TEST: value.NODE_ENV === 'test',
   IS_DEV: value.NODE_ENV === 'development',
+};
+
+/** The public base URL for a given request — explicit setting first. */
+env.publicUrlFor = (req) => {
+  if (env.PUBLIC_URL) return env.PUBLIC_URL.replace(/\/$/, '');
+  // `req.protocol` respects X-Forwarded-Proto because of `trust proxy`, so this
+  // is https on Render/Heroku and http on a local machine.
+  return req && req.get('host') ? `${req.protocol}://${req.get('host')}` : '';
 };
 
 /** CORS origin in the shape the `cors` package (and Socket.io) expects. */
